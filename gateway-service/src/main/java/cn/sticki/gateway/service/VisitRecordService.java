@@ -7,11 +7,13 @@ import cn.sticki.gateway.pojo.VisitRecord;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Map;
@@ -32,6 +34,9 @@ import java.util.concurrent.TimeUnit;
 public class VisitRecordService {
 
 	private final String attributeKey = "visitRecord";
+
+	@Resource
+	private StringRedisTemplate stringRedisTemplate;
 
 	public VisitRecordService() {
 		this.shutdownHook();
@@ -120,6 +125,9 @@ public class VisitRecordService {
 		// 打印访问情况
 		log.info(visitRecord.toString());
 
+		// 聚合访问统计到 Redis
+		aggregateStats(visitRecord);
+
 		// 添加访问记录
 		addRecord(visitRecord);
 	}
@@ -199,6 +207,29 @@ public class VisitRecordService {
 				log.error("访问日志保存异常，丢弃数据{}条", oldCache.size());
 			}
 		}
+	}
+
+	/**
+	 * 聚合访问统计到 Redis：PV 计数、UV HyperLogLog、API 热度 ZSet
+	 */
+	private void aggregateStats(VisitRecord record) {
+		String dateKey = LocalDate.now().toString();
+
+		// PV 计数
+		String pvKey = "gateway:stats:pv:" + dateKey;
+		stringRedisTemplate.opsForValue().increment(pvKey);
+		stringRedisTemplate.expire(pvKey, 7, TimeUnit.DAYS);
+
+		// UV HyperLogLog（登录用户用 userId，匿名用 IP）
+		String uvKey = "gateway:stats:uv:" + dateKey;
+		String uvIdentifier = record.getUserId() != null
+				? String.valueOf(record.getUserId())
+				: String.valueOf(record.getIp());
+		stringRedisTemplate.opsForHyperLogLog().add(uvKey, uvIdentifier);
+
+		// API 热度 ZSet
+		String apiKey = "gateway:stats:api:" + dateKey;
+		stringRedisTemplate.opsForZSet().incrementScore(apiKey, record.getUri(), 1.0);
 	}
 
 }

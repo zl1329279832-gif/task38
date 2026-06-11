@@ -64,4 +64,27 @@ public interface RankService {
 	 */
 	void increaseRankAuthorScore(Integer blogId, Double score);
 
+	/**
+	 * 基于时间衰减重新计算博客热榜分数
+	 *
+	 * @param blogId 博客id
+	 */
+	void recalculateBlogHotScore(int blogId);
+
+	/**
+	 * 更新作者活跃度分数
+	 *
+	 * @param authorId 作者id
+	 * @param score    增加的分数
+	 */
+	void updateAuthorActivityScore(int authorId, double score);
+
+	/**
+	 * 对博客施加风控降权
+	 *
+	 * @param blogId     博客id
+	 * @param riskFactor 风险因子 (0~1)，越大降权越严重
+	 */
+	void applyRiskDemotion(int blogId, double riskFactor);
+
 }

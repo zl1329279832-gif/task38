@@ -1,6 +1,7 @@
 package cn.sticki.blog.service.impl;
 
 import cn.sticki.blog.mapper.BlogMapper;
+import cn.sticki.blog.pojo.bo.BlogStats;
 import cn.sticki.blog.pojo.domain.Blog;
 import cn.sticki.blog.pojo.vo.RankAuthorVO;
 import cn.sticki.blog.pojo.vo.RankHotVO;
@@ -14,6 +15,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +34,9 @@ public class RankServiceImpl implements RankService {
 	RedisTemplate<String, Integer> redisTemplate;
 
 	@Resource
+	StringRedisTemplate stringRedisTemplate;
+
+	@Resource
 	UserClient userClient;
 
 	@Resource
@@ -39,6 +44,9 @@ public class RankServiceImpl implements RankService {
 
 	@Resource
 	BlogService blogService;
+
+	@Resource
+	BlogStatsCacheService blogStatsCacheService;
 
 	@Override
 	public List<RankHotVO> getTodayHotRank() {
@@ -142,6 +150,58 @@ public class RankServiceImpl implements RankService {
 		// 作者排行榜总热度 加 score
 		redisTemplate.opsForZSet().incrementScore(RANK_AUTHOR_WEEK_KEY, authorId, score);
 
+	}
+
+	@Override
+	public void recalculateBlogHotScore(int blogId) {
+		BlogStats stats = blogStatsCacheService.getBlogStats(blogId);
+		if (stats == null) {
+			return;
+		}
+
+		int views = stats.getViewCount() != null ? stats.getViewCount() : 0;
+		int likes = stats.getLikeCount() != null ? stats.getLikeCount() : 0;
+		int collects = stats.getCollectCount() != null ? stats.getCollectCount() : 0;
+		int comments = stats.getCommentCount() != null ? stats.getCommentCount() : 0;
+
+		double rawScore = views * 1.0 + likes * 3.0 + collects * 3.0 + comments * 3.0;
+
+		long now = System.currentTimeMillis();
+		double ageHours = (now - stats.getPublishTimestamp()) / 3600000.0;
+		double timeDecayed = rawScore / Math.pow(ageHours + 2, 1.8);
+
+		// 风控降权
+		String riskStr = stringRedisTemplate.opsForValue().get(BLOG_RISK_KEY + blogId);
+		if (riskStr != null) {
+			double riskFactor = Double.parseDouble(riskStr);
+			timeDecayed = timeDecayed * (1 - riskFactor);
+		}
+
+		long dayKey = RankKeyUtils.getDayKey();
+		String key = RANK_HOT_DAY_KEY + dayKey;
+		redisTemplate.opsForZSet().add(key, blogId, timeDecayed);
+		if (Boolean.FALSE.equals(redisTemplate.hasKey(key))) {
+			redisTemplate.expire(key, RANK_HOT_DAY_TTL, TimeUnit.SECONDS);
+		}
+	}
+
+	@Override
+	public void updateAuthorActivityScore(int authorId, double score) {
+		long weekKey = RankKeyUtils.getWeekKey();
+		String key = RANK_AUTHOR_ACTIVITY_KEY + weekKey;
+		redisTemplate.opsForZSet().incrementScore(key, authorId, score);
+		redisTemplate.expire(key, RANK_HOT_WEEK_TTL, TimeUnit.SECONDS);
+	}
+
+	@Override
+	public void applyRiskDemotion(int blogId, double riskFactor) {
+		stringRedisTemplate.opsForValue().set(
+				BLOG_RISK_KEY + blogId,
+				String.valueOf(riskFactor),
+				7, TimeUnit.DAYS
+		);
+		// 立即重算热榜分数
+		recalculateBlogHotScore(blogId);
 	}
 
 	/**

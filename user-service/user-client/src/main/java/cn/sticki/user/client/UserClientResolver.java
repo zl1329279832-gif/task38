@@ -65,6 +65,18 @@ public class UserClientResolver implements UserClient {
 	}
 
 	/**
+	 * 获取用户粉丝ID列表
+	 *
+	 * @param userId 用户id
+	 * @return 粉丝ID列表
+	 */
+	@Override
+	public RestResult<List<Integer>> getFansIdList(Integer userId) {
+		log.error("User 服务异常：getFansIdList 请求失败");
+		return RestResult.fail("request fail");
+	}
+
+	/**
 	 * 批量查询用户各项数据统计数据
 	 *
 	 * @param userIdList 用户id列表

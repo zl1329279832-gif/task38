@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +32,9 @@ public class UserFollowServiceImpl extends ServiceImpl<UserFollowMapper, UserFol
 
 	@Resource
 	private FansViewMapper fansViewMapper;
+
+	@Resource
+	private RabbitTemplate rabbitTemplate;
 
 	@Override
 	public boolean follow(int userId, int followId) {
@@ -86,6 +90,14 @@ public class UserFollowServiceImpl extends ServiceImpl<UserFollowMapper, UserFol
 	@Override
 	public List<Integer> getFollowIdList(int userId) {
 		return followViewMapper.selectFollowIdByUserId(userId);
+	}
+
+	@Override
+	public List<Integer> getFansIdList(int userId) {
+		LambdaQueryWrapper<FansView> wrapper = new LambdaQueryWrapper<>();
+		wrapper.eq(FansView::getUserId, userId).eq(FansView::getStatus, 1);
+		List<FansView> fansList = fansViewMapper.selectList(wrapper);
+		return fansList.stream().map(FansView::getFansId).toList();
 	}
 
 }

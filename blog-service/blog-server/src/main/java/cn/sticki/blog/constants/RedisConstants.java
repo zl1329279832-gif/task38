@@ -19,4 +19,8 @@ public class RedisConstants {
 
 	public static final String RANK_AUTHOR_TOTAL_KEY = "rank:author:total";
 
+	public static final String RANK_AUTHOR_ACTIVITY_KEY = "rank:author:activity:";
+
+	public static final String BLOG_RISK_KEY = "blog:risk:";
+
 }
