@@ -138,7 +138,7 @@ public class BlogListener {
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_PUBLISH_QUEUE_CANCEL),
-			key = BLOG_INSERT_KEY
+			key = BLOG_DELETE_KEY
 	))
 	public void publishReduceUserGeneral(BlogOperateDTO blogOperateDTO) {
 		log.debug("用户 {} 删除博客数 -1", blogOperateDTO.getAuthorId());

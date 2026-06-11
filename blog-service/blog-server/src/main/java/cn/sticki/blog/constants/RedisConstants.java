@@ -19,4 +19,22 @@ public class RedisConstants {
 
 	public static final String RANK_AUTHOR_TOTAL_KEY = "rank:author:total";
 
+	public static final String RANK_HOT_REALTIME_KEY = "rank:hot:realtime:";
+
+	public static final Long RANK_HOT_REALTIME_TTL = 60 * 60 * 24 * 7L;
+
+	public static final String BLOG_RISK_KEY = "blog:risk:";
+
+	public static final Long BLOG_RISK_TTL = 60 * 60 * 24 * 30L;
+
+	public static final String RANK_AUTHOR_ACTIVITY_KEY = "rank:author:activity:";
+
+	public static final Long RANK_AUTHOR_ACTIVITY_TTL = 60 * 60 * 24 * 7L;
+
+	public static final String FEED_KEY_PREFIX = "feed:";
+
+	public static final Long FEED_TTL = 60 * 60 * 24 * 30L;
+
+	public static final int FEED_MAX_SIZE = 500;
+
 }

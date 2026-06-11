@@ -1,5 +1,6 @@
 package cn.sticki.gateway.service;
 
+import cn.hutool.core.net.Ipv4Util;
 import cn.hutool.core.thread.ThreadFactoryBuilder;
 import cn.sticki.common.web.utils.RequestUtils;
 import cn.sticki.gateway.filter.AuthorizeFilter;
@@ -7,11 +8,13 @@ import cn.sticki.gateway.pojo.VisitRecord;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.Nullable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ServerWebExchange;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Map;
@@ -122,6 +125,9 @@ public class VisitRecordService {
 
 		// 添加访问记录
 		addRecord(visitRecord);
+
+		// 聚合统计
+		aggregateStats(visitRecord);
 	}
 
 	/**
@@ -174,6 +180,39 @@ public class VisitRecordService {
 
 	@Resource
 	VisitLogService visitLogService;
+
+	@Resource
+	private StringRedisTemplate stringRedisTemplate;
+
+	private static final String STATS_PV_PREFIX = "gateway:stats:pv:";
+	private static final String STATS_UV_PREFIX = "gateway:stats:uv:";
+	private static final String STATS_API_PREFIX = "gateway:stats:api:";
+	private static final long STATS_TTL = 60 * 60 * 24 * 7L; // 7 days
+
+	private void aggregateStats(VisitRecord record) {
+		try {
+			String date = LocalDate.now().toString(); // yyyy-MM-dd
+			String pvKey = STATS_PV_PREFIX + date;
+			String uvKey = STATS_UV_PREFIX + date;
+			String apiKey = STATS_API_PREFIX + date;
+
+			// PV increment
+			stringRedisTemplate.opsForValue().increment(pvKey);
+			stringRedisTemplate.expire(pvKey, STATS_TTL, TimeUnit.SECONDS);
+
+			// UV via HyperLogLog
+			String identifier = record.getUserId() != null ? String.valueOf(record.getUserId()) : Ipv4Util.longToIpv4(record.getIp());
+			stringRedisTemplate.opsForHyperLogLog().add(uvKey, identifier);
+			stringRedisTemplate.expire(uvKey, STATS_TTL, TimeUnit.SECONDS);
+
+			// API endpoint hits
+			stringRedisTemplate.opsForZSet().incrementScore(apiKey, record.getUri(), 1);
+			stringRedisTemplate.expire(apiKey, STATS_TTL, TimeUnit.SECONDS);
+		} catch (Exception e) {
+			// Stats aggregation should not break the request flow
+			log.warn("网关统计聚合异常: {}", e.getMessage());
+		}
+	}
 
 	/**
 	 * 单次批量插入的数据量

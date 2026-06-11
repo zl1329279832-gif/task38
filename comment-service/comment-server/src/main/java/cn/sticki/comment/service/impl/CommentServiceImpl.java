@@ -9,6 +9,7 @@ import cn.sticki.comment.pojo.CommentBO;
 import cn.sticki.comment.pojo.CommentListVO;
 import cn.sticki.comment.pojo.CommentVO;
 import cn.sticki.comment.sdk.CommentDTO;
+import cn.sticki.comment.sdk.CommentEvent;
 import cn.sticki.comment.service.CommentService;
 import cn.sticki.common.exception.BusinessException;
 import cn.sticki.common.result.RestResult;
@@ -77,13 +78,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 		comment.setCreateTime(new Timestamp(System.currentTimeMillis()));
 		commentMapper.insert(comment);
 		// 发送消息：博客评论数增加
-		CommentDTO commentDTO = new CommentDTO();
-		commentDTO.setBlogId(comment.getBlogId());
-		commentDTO.setContent(comment.getContent());
-		commentDTO.setUserId(comment.getUserId());
-		// noinspection ConstantConditions
-		commentDTO.setAuthorId(result.getData().getAuthorId());
-		rabbitTemplate.convertAndSend(COMMENT_TOPIC_EXCHANGE, BLOG_COMMENT_INCREASE_KEY, commentDTO);
+		rabbitTemplate.convertAndSend(COMMENT_TOPIC_EXCHANGE, BLOG_COMMENT_INCREASE_KEY,
+				CommentEvent.ofIncrease(comment.getBlogId(), comment.getUserId(), comment.getContent(), result.getData().getAuthorId(), comment.getId()));
 
 		log.info("博客评论增加，blogId={},commentId={}", comment.getBlogId(), comment.getId());
 	}
@@ -101,11 +97,8 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, Comment> impl
 		// 3. 查询博客作者id，发送消息，减少评论数量
 		RestResult<BlogDTO> result = blogClient.getBlogInfo(comment.getBlogId());
 		// 封装评论对象发送消息
-		CommentDTO commentDTO = new CommentDTO();
-		commentDTO.setAuthorId(result.getData().getAuthorId());
-		commentDTO.setUserId(userId);
-		commentDTO.setBlogId(comment.getBlogId());
-		rabbitTemplate.convertAndSend(COMMENT_TOPIC_EXCHANGE, BLOG_COMMENT_DECREASE_KEY, commentDTO);
+		rabbitTemplate.convertAndSend(COMMENT_TOPIC_EXCHANGE, BLOG_COMMENT_DECREASE_KEY,
+				CommentEvent.ofDecrease(comment.getBlogId(), userId, result.getData().getAuthorId(), commentId));
 	}
 
 	@Override

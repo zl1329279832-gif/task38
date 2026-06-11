@@ -86,4 +86,12 @@ public class FollowController {
 		return userFollowService.getFollowIdList(userId);
 	}
 
+	/**
+	 * 获取粉丝id列表
+	 */
+	@GetMapping("/fansId")
+	public List<Integer> getFansIdList(@NotNull Integer userId) {
+		return userFollowService.getFansIdList(userId);
+	}
+
 }

@@ -49,4 +49,12 @@ public interface UserFollowService extends IService<UserFollow> {
 	 */
 	List<Integer> getFollowIdList(int userId);
 
+	/**
+	 * 获取粉丝id列表
+	 *
+	 * @param userId 用户id
+	 * @return 粉丝id列表
+	 */
+	List<Integer> getFansIdList(int userId);
+
 }

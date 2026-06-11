@@ -9,7 +9,7 @@ import cn.sticki.blog.pojo.domain.BlogView;
 import cn.sticki.blog.pojo.vo.BlogContentVO;
 import cn.sticki.blog.pojo.vo.BlogInfoListVO;
 import cn.sticki.blog.pojo.vo.BlogStatusListVO;
-import cn.sticki.blog.sdk.BlogOperateDTO;
+import cn.sticki.blog.sdk.BlogEvent;
 import cn.sticki.blog.service.BlogViewService;
 import cn.sticki.blog.type.BlogStatusType;
 import cn.sticki.common.result.RestResult;
@@ -174,11 +174,7 @@ public class BlogViewServiceImpl extends ServiceImpl<BlogViewMapper, BlogView> i
 		if (Boolean.TRUE.equals(success)) {
 			blogGeneralMapper.increaseViewNum(blogId);
 			// 封装好请求体后，发送到MQ
-			BlogOperateDTO blogOperateDTO = new BlogOperateDTO();
-			blogOperateDTO.setBlogId(blogId);
-			blogOperateDTO.setAuthorId(authorId);
-			blogOperateDTO.setUserId(userId);
-			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_OPERATE_READ_KEY, blogOperateDTO);
+			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_OPERATE_READ_KEY, BlogEvent.ofRead(blogId, userId, authorId));
 		}
 	}
 

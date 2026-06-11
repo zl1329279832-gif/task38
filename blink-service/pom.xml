@@ -12,6 +12,7 @@
 	<artifactId>blink-service</artifactId>
 	<packaging>pom</packaging>
 	<modules>
+		<module>blink-sdk</module>
 		<module>blink-server</module>
 	</modules>
 

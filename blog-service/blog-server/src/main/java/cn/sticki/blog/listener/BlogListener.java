@@ -1,14 +1,13 @@
 package cn.sticki.blog.listener;
 
-import cn.sticki.blog.sdk.BlogOperateDTO;
+import cn.sticki.blog.sdk.BlogEvent;
+import cn.sticki.blog.sdk.BlogMqConstants;
 import cn.sticki.blog.service.RankService;
+import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.ExchangeTypes;
-import org.springframework.amqp.rabbit.annotation.Exchange;
-import org.springframework.amqp.rabbit.annotation.Queue;
-import org.springframework.amqp.rabbit.annotation.QueueBinding;
-import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.amqp.rabbit.annotation.*;
 import org.springframework.stereotype.Component;
 
 import static cn.sticki.blog.sdk.BlogMqConstants.*;
@@ -35,58 +34,64 @@ public class BlogListener {
 	@Resource
 	private RankService rankService;
 
+	@Resource
+	private EventIdempotencyService eventIdempotencyService;
+
 	/**
 	 * 用户浏览博客对博客热度进行增加
 	 *
-	 * @param blogOperateDTO 用户操作消息
+	 * @param event 博客事件
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = SEE_RANK_QUEUE),
 			key = BLOG_OPERATE_READ_KEY
 	))
-	public void seeAddRankHotScore(BlogOperateDTO blogOperateDTO) {
-		log.debug("{} 被浏览热度加1", blogOperateDTO.getBlogId());
-		// 博客热度加 1
-		rankService.increaseRankHotScore(blogOperateDTO.getBlogId(), 1d);
-		// 作者热度加 1
-		rankService.increaseRankAuthorScore(blogOperateDTO.getBlogId(), 1d);
+	public void seeAddRankHotScore(BlogEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		log.debug("{} 被浏览热度加1", event.getBlogId());
+		// 重新计算博客热榜分数（含时间衰减和风控）
+		rankService.recalculateBlogHotScore(event.getBlogId());
+		// 作者活跃度加1
+		rankService.updateAuthorActivityScore(event.getAuthorId(), 1.0);
 	}
 
 	/**
 	 * 用户收藏博客对博客热度进行增加
 	 *
-	 * @param blogOperateDTO 用户操作消息
+	 * @param event 博客事件
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = COLLECT_RANK_QUEUE),
 			key = BLOG_OPERATE_COLLECT_KEY
 	))
-	public void collectAddRankHotScore(BlogOperateDTO blogOperateDTO) {
-		log.debug("{} 被收藏热度加3", blogOperateDTO.getBlogId());
-		// 博客热度加 3
-		rankService.increaseRankHotScore(blogOperateDTO.getBlogId(), 3d);
-		// 作者热度加 3
-		rankService.increaseRankAuthorScore(blogOperateDTO.getBlogId(), 3d);
+	public void collectAddRankHotScore(BlogEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		log.debug("{} 被收藏热度加3", event.getBlogId());
+		// 重新计算博客热榜分数（含时间衰减和风控）
+		rankService.recalculateBlogHotScore(event.getBlogId());
+		// 作者活跃度加3
+		rankService.updateAuthorActivityScore(event.getAuthorId(), 3.0);
 	}
 
 	/**
 	 * 用户点赞博客对博客热度进行增加
 	 *
-	 * @param blogOperateDTO 用户操作消息
+	 * @param event 博客事件
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = LIKE_RANK_QUEUE),
 			key = BLOG_OPERATE_LIKE_KEY
 	))
-	public void likeAddRankHotScore(BlogOperateDTO blogOperateDTO) {
-		log.debug("{} 被点赞热度加3", blogOperateDTO.getBlogId());
-		// 执行热度加 3
-		rankService.increaseRankHotScore(blogOperateDTO.getBlogId(), 3d);
-		// 作者热度加 3
-		rankService.increaseRankAuthorScore(blogOperateDTO.getBlogId(), 3d);
+	public void likeAddRankHotScore(BlogEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		log.debug("{} 被点赞热度加3", event.getBlogId());
+		// 重新计算博客热榜分数（含时间衰减和风控）
+		rankService.recalculateBlogHotScore(event.getBlogId());
+		// 作者活跃度加3
+		rankService.updateAuthorActivityScore(event.getAuthorId(), 3.0);
 	}
 
 }

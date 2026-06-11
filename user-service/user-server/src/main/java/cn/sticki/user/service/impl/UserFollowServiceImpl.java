@@ -5,6 +5,8 @@ import cn.sticki.user.mapper.FansViewMapper;
 import cn.sticki.user.mapper.FollowViewMapper;
 import cn.sticki.user.mapper.UserFollowMapper;
 import cn.sticki.user.pojo.*;
+import cn.sticki.user.sdk.FollowEvent;
+import cn.sticki.user.sdk.UserMqConstants;
 import cn.sticki.user.service.UserFollowService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -12,6 +14,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +35,9 @@ public class UserFollowServiceImpl extends ServiceImpl<UserFollowMapper, UserFol
 	@Resource
 	private FansViewMapper fansViewMapper;
 
+	@Resource
+	private RabbitTemplate rabbitTemplate;
+
 	@Override
 	public boolean follow(int userId, int followId) {
 		if (userId == followId) {
@@ -39,13 +45,14 @@ public class UserFollowServiceImpl extends ServiceImpl<UserFollowMapper, UserFol
 		}
 		// 关注用户，查询是否存在关注记录，若不存在，则添加记录，若存在，则取消记录
 		UserFollow follow = lambdaQuery().eq(UserFollow::getFansId, userId).eq(UserFollow::getFollowId, followId).one();
+		boolean followed;
 		// 用户关注使用状态区分，用户快速点击的时候会存在insert多条数据的情况。
 		if (Objects.nonNull(follow)) {
 			// 用户的关注使用状态区分，把关注状态取反
 			boolean isFollowed = follow.getStatus() == 1;
 			lambdaUpdate().set(UserFollow::getStatus, isFollowed ? 0 : 1)
 					.eq(UserFollow::getId, follow.getId()).update();
-			return !isFollowed;
+			followed = !isFollowed;
 		} else {
 			UserFollow userFollow = new UserFollow();
 			userFollow.setFansId(userId);
@@ -54,8 +61,13 @@ public class UserFollowServiceImpl extends ServiceImpl<UserFollowMapper, UserFol
 			userFollow.setCreateTime(new Timestamp(System.currentTimeMillis()));
 			// 不存在，添加记录，返回true
 			this.save(userFollow);
-			return true;
+			followed = true;
 		}
+		// 发布关注/取消关注事件
+		FollowEvent event = FollowEvent.of(userId, followId, followed);
+		rabbitTemplate.convertAndSend(UserMqConstants.USER_TOPIC_EXCHANGE,
+				followed ? UserMqConstants.USER_FOLLOW_KEY : UserMqConstants.USER_UNFOLLOW_KEY, event);
+		return followed;
 	}
 
 	@Override
@@ -86,6 +98,13 @@ public class UserFollowServiceImpl extends ServiceImpl<UserFollowMapper, UserFol
 	@Override
 	public List<Integer> getFollowIdList(int userId) {
 		return followViewMapper.selectFollowIdByUserId(userId);
+	}
+
+	@Override
+	public List<Integer> getFansIdList(int userId) {
+		LambdaQueryWrapper<FansView> wrapper = new LambdaQueryWrapper<>();
+		wrapper.eq(FansView::getUserId, userId).eq(FansView::getStatus, 1);
+		return fansViewMapper.selectList(wrapper).stream().map(FansView::getFansId).toList();
 	}
 
 }

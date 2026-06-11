@@ -6,6 +6,8 @@ import cn.sticki.blink.pojo.Blink;
 import cn.sticki.blink.pojo.BlinkGeneral;
 import cn.sticki.blink.pojo.SaveBlinkBO;
 import cn.sticki.blink.pojo.UpdateBlinkBO;
+import cn.sticki.blink.sdk.BlinkEvent;
+import cn.sticki.blink.sdk.BlinkMqConstants;
 import cn.sticki.blink.service.BlinkService;
 import cn.sticki.common.exception.MapperException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -13,6 +15,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,6 +36,9 @@ public class BlinkServiceImpl extends ServiceImpl<BlinkMapper, Blink> implements
 	@Resource
 	private BlinkGeneralMapper blinkGeneralMapper;
 
+	@Resource
+	private RabbitTemplate rabbitTemplate;
+
 	@Override
 	public void create(SaveBlinkBO blinkBO) {
 		Blink blink = new Blink();
@@ -43,6 +49,10 @@ public class BlinkServiceImpl extends ServiceImpl<BlinkMapper, Blink> implements
 		general.setBlinkId(blink.getId());
 		general.setScore(getRating(blink));
 		blinkGeneralMapper.insert(general);
+
+		// 发布动态创建事件
+		BlinkEvent event = BlinkEvent.ofInsert(blink.getId(), blink.getUserId());
+		rabbitTemplate.convertAndSend(BlinkMqConstants.BLINK_TOPIC_EXCHANGE, BlinkMqConstants.BLINK_INSERT_KEY, event);
 	}
 
 	@Override
@@ -53,6 +63,10 @@ public class BlinkServiceImpl extends ServiceImpl<BlinkMapper, Blink> implements
 			throw new MapperException("动态删除失败", "id -> " + id);
 		}
 		blinkGeneralMapper.deleteById(id);
+
+		// 发布动态删除事件
+		BlinkEvent event = BlinkEvent.ofDelete(id, userId);
+		rabbitTemplate.convertAndSend(BlinkMqConstants.BLINK_TOPIC_EXCHANGE, BlinkMqConstants.BLINK_DELETE_KEY, event);
 	}
 
 	@Override

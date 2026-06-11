@@ -64,4 +64,34 @@ public interface RankService {
 	 */
 	void increaseRankAuthorScore(Integer blogId, Double score);
 
+	/**
+	 * 重新计算博客热榜分数（含时间衰减和风控）
+	 *
+	 * @param blogId 博客id
+	 */
+	void recalculateBlogHotScore(Integer blogId);
+
+	/**
+	 * 应用风控降权
+	 *
+	 * @param blogId     博客id
+	 * @param riskFactor 风控降权系数
+	 */
+	void applyRiskDemotion(Integer blogId, double riskFactor);
+
+	/**
+	 * 获取实时热榜排行
+	 *
+	 * @return 实时热榜排行信息
+	 */
+	List<RankHotVO> getRealtimeHotRank();
+
+	/**
+	 * 更新作者活跃度分数
+	 *
+	 * @param authorId 作者id
+	 * @param delta    分数增量
+	 */
+	void updateAuthorActivityScore(Integer authorId, double delta);
+
 }

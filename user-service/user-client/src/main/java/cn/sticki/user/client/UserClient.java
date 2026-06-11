@@ -57,6 +57,15 @@ public interface UserClient {
 	RestResult<List<Integer>> getFollowIdList(@RequestParam Integer userId);
 
 	/**
+	 * 获取用户粉丝id列表
+	 *
+	 * @param userId 用户id
+	 * @return 粉丝id列表
+	 */
+	@GetMapping("/user/fansId")
+	RestResult<List<Integer>> getFansIdList(@RequestParam Integer userId);
+
+	/**
 	 * 批量查询用户各项数据统计数据
 	 *
 	 * @param userIdList 用户id列表

@@ -11,9 +11,9 @@ import org.springframework.amqp.rabbit.annotation.QueueBinding;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
-import static cn.sticki.blog.sdk.BlogMqConstants.BLOG_TOPIC_EXCHANGE;
 import static cn.sticki.comment.sdk.MqConstants.BLOG_COMMENT_DECREASE_KEY;
 import static cn.sticki.comment.sdk.MqConstants.BLOG_COMMENT_INCREASE_KEY;
+import static cn.sticki.comment.sdk.MqConstants.COMMENT_TOPIC_EXCHANGE;
 
 /**
  * @author durance
@@ -37,7 +37,7 @@ public class CommentListener {
 	 * @param commentDTO 评论操作操作消息
 	 */
 	@RabbitListener(bindings = @QueueBinding(
-			exchange = @Exchange(name = BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
+			exchange = @Exchange(name = COMMENT_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_COMMENT_QUEUE),
 			key = BLOG_COMMENT_INCREASE_KEY
 	))
@@ -53,7 +53,7 @@ public class CommentListener {
 	 * @param commentDTO 评论操作操作消息
 	 */
 	@RabbitListener(bindings = @QueueBinding(
-			exchange = @Exchange(name = BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
+			exchange = @Exchange(name = COMMENT_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_COMMENT_QUEUE_CANCEL),
 			key = BLOG_COMMENT_DECREASE_KEY
 	))

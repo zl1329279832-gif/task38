@@ -9,7 +9,7 @@ import cn.sticki.blog.pojo.domain.Blog;
 import cn.sticki.blog.pojo.domain.BlogView;
 import cn.sticki.blog.pojo.domain.CollectBlog;
 import cn.sticki.blog.pojo.vo.BlogListVO;
-import cn.sticki.blog.sdk.BlogOperateDTO;
+import cn.sticki.blog.sdk.BlogEvent;
 import cn.sticki.blog.service.CollectBlogService;
 import cn.sticki.common.exception.BusinessException;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -69,7 +69,7 @@ public class CollectBlogServiceImpl extends ServiceImpl<CollectBlogMapper, Colle
 			collectBlogMapper.deleteById(selectOne);
 			blogGeneralMapper.decreaseCollectionNum(blogId);
 			// 向rabbitMQ发送 取消收藏博客消息
-			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_OPERATE_COLLECT_CANCEL_KEY, new BlogOperateDTO(blogId, userId, blog.getAuthorId()));
+			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_OPERATE_COLLECT_CANCEL_KEY, BlogEvent.ofCollectCancel(blogId, userId, blog.getAuthorId()));
 			return false;
 		} else {
 			CollectBlog collectBlog = new CollectBlog();
@@ -79,7 +79,7 @@ public class CollectBlogServiceImpl extends ServiceImpl<CollectBlogMapper, Colle
 			collectBlogMapper.insert(collectBlog);
 			blogGeneralMapper.increaseCollectionNum(blogId);
 			// 向rabbitMQ发送 收藏博客消息
-			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_OPERATE_COLLECT_KEY, new BlogOperateDTO(blogId, userId, blog.getAuthorId()));
+			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_OPERATE_COLLECT_KEY, BlogEvent.ofCollect(blogId, userId, blog.getAuthorId()));
 			return true;
 		}
 	}

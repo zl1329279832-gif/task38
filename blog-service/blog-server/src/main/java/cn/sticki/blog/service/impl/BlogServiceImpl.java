@@ -28,6 +28,7 @@ import java.sql.Timestamp;
 import java.util.List;
 
 import static cn.sticki.blog.sdk.BlogMqConstants.*;
+import cn.sticki.blog.sdk.BlogEvent;
 
 /**
  * @author 阿杆
@@ -120,7 +121,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements Bl
 			throw new MapperException("博客内容更新失败", "id->" + blog.getId());
 		}
 		// 7. 发送MQ消息
-		rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_UPDATE_KEY, blog);
+		rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_UPDATE_KEY, BlogEvent.ofUpdate(blog.getId(), blog.getAuthorId()));
 	}
 
 	/**
@@ -170,7 +171,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements Bl
 			throw new MapperException("新增博客失败", "blog_general insert error!");
 		}
 		// 9. 发送MQ消息
-		rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_INSERT_KEY, blog);
+		rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_INSERT_KEY, BlogEvent.ofInsert(blog.getId(), blog.getAuthorId()));
 	}
 
 	private int ratingBlog(@NotNull String blog) {
@@ -263,7 +264,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements Bl
 				.set(Blog::getStatus, blog.getStatus()).update();
 		if (isSuccess) {
 			// 发送消息到MQ
-			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_UPDATE_KEY, blog);
+			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_UPDATE_KEY, BlogEvent.ofDelete(blogId, blog.getAuthorId()));
 		}
 		return isSuccess;
 	}
@@ -291,7 +292,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements Bl
 		boolean isSuccess = removeById(blogId);
 		if (isSuccess) {
 			// 发送删除的消息到MQ
-			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_DELETE_KEY, blogId);
+			rabbitTemplate.convertAndSend(BLOG_TOPIC_EXCHANGE, BLOG_DELETE_KEY, BlogEvent.ofDelete(blogId, blog.getAuthorId()));
 			try {
 				// 删除其他相应的信息表
 				blogGeneralMapper.deleteById(blogId);

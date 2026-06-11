@@ -38,6 +38,12 @@
 
 		<dependency>
 			<groupId>cn.sticki</groupId>
+			<artifactId>user-sdk</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>cn.sticki</groupId>
 			<artifactId>common-amqp</artifactId>
 			<version>1.0.0</version>
 		</dependency>

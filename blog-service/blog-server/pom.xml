@@ -62,6 +62,12 @@
 
 		<dependency>
 			<groupId>cn.sticki</groupId>
+			<artifactId>blink-sdk</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
+		<dependency>
+			<groupId>cn.sticki</groupId>
 			<artifactId>blog-sdk</artifactId>
 			<version>1.0.0</version>
 		</dependency>
@@ -138,6 +144,12 @@
 			<artifactId>resource-sdk</artifactId>
 			<version>1.0.0</version>
 			<scope>compile</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>cn.sticki</groupId>
+			<artifactId>user-sdk</artifactId>
+			<version>1.0.0</version>
 		</dependency>
 	</dependencies>
 
