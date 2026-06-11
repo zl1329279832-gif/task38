@@ -2,6 +2,7 @@ package cn.sticki.blog.listener;
 
 import cn.sticki.blog.mapper.BlogGeneralMapper;
 import cn.sticki.blog.service.RankService;
+import cn.sticki.blog.service.impl.BlogStatsCacheService;
 import cn.sticki.comment.sdk.CommentEvent;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
 import jakarta.annotation.Resource;
@@ -38,6 +39,9 @@ public class CommentListener {
 	@Resource
 	private EventIdempotencyService eventIdempotencyService;
 
+	@Resource
+	private BlogStatsCacheService blogStatsCacheService;
+
 	/**
 	 * 博客评论数量增加
 	 *
@@ -53,6 +57,8 @@ public class CommentListener {
 		// 增加博客的评论数量
 		log.debug("{} 评论数量+1", event.getBlogId());
 		blogGeneralMapper.increaseCommentNum(event.getBlogId());
+		// 使博客统计缓存失效，确保重算时使用最新数据
+		blogStatsCacheService.invalidate(event.getBlogId());
 		// 重新计算博客热榜分数（含时间衰减和风控）
 		rankService.recalculateBlogHotScore(event.getBlogId());
 	}
@@ -72,6 +78,8 @@ public class CommentListener {
 		// 减少博客的评论数量
 		log.debug("{} 评论数量-1", event.getBlogId());
 		blogGeneralMapper.decreaseCommentNum(event.getBlogId());
+		// 使博客统计缓存失效，确保重算时使用最新数据
+		blogStatsCacheService.invalidate(event.getBlogId());
 		// 重新计算博客热榜分数（含时间衰减和风控）
 		rankService.recalculateBlogHotScore(event.getBlogId());
 	}

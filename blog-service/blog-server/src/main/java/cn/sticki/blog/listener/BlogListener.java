@@ -3,6 +3,7 @@ package cn.sticki.blog.listener;
 import cn.sticki.blog.sdk.BlogEvent;
 import cn.sticki.blog.sdk.BlogMqConstants;
 import cn.sticki.blog.service.RankService;
+import cn.sticki.blog.service.impl.BlogStatsCacheService;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,9 @@ public class BlogListener {
 	@Resource
 	private EventIdempotencyService eventIdempotencyService;
 
+	@Resource
+	private BlogStatsCacheService blogStatsCacheService;
+
 	/**
 	 * 用户浏览博客对博客热度进行增加
 	 *
@@ -50,6 +54,8 @@ public class BlogListener {
 	public void seeAddRankHotScore(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("{} 被浏览热度加1", event.getBlogId());
+		// 使博客统计缓存失效，确保重算时使用最新数据
+		blogStatsCacheService.invalidate(event.getBlogId());
 		// 重新计算博客热榜分数（含时间衰减和风控）
 		rankService.recalculateBlogHotScore(event.getBlogId());
 		// 作者活跃度加1
@@ -69,6 +75,8 @@ public class BlogListener {
 	public void collectAddRankHotScore(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("{} 被收藏热度加3", event.getBlogId());
+		// 使博客统计缓存失效，确保重算时使用最新数据
+		blogStatsCacheService.invalidate(event.getBlogId());
 		// 重新计算博客热榜分数（含时间衰减和风控）
 		rankService.recalculateBlogHotScore(event.getBlogId());
 		// 作者活跃度加3
@@ -88,6 +96,8 @@ public class BlogListener {
 	public void likeAddRankHotScore(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("{} 被点赞热度加3", event.getBlogId());
+		// 使博客统计缓存失效，确保重算时使用最新数据
+		blogStatsCacheService.invalidate(event.getBlogId());
 		// 重新计算博客热榜分数（含时间衰减和风控）
 		rankService.recalculateBlogHotScore(event.getBlogId());
 		// 作者活跃度加3

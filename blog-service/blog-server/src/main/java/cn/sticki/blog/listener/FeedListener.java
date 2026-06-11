@@ -2,6 +2,7 @@ package cn.sticki.blog.listener;
 
 import cn.sticki.blog.sdk.BlogEvent;
 import cn.sticki.blog.sdk.BlogMqConstants;
+import cn.sticki.blog.service.CompensationService;
 import cn.sticki.blog.service.FeedService;
 import cn.sticki.blink.sdk.BlinkEvent;
 import cn.sticki.blink.sdk.BlinkMqConstants;
@@ -32,6 +33,9 @@ public class FeedListener {
 	@Resource
 	private EventIdempotencyService eventIdempotencyService;
 
+	@Resource
+	private CompensationService compensationService;
+
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BlogMqConstants.BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = FEED_PUBLISH_QUEUE),
@@ -40,7 +44,14 @@ public class FeedListener {
 	public void onBlogPublish(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("博客发布推送到关注流: blogId={}", event.getBlogId());
-		feedService.pushBlogToFollowers(event.getAuthorId(), event.getBlogId(), event.getTimestamp() / 1000);
+		try {
+			feedService.pushBlogToFollowers(event.getAuthorId(), event.getBlogId(), event.getTimestamp() / 1000);
+		} catch (Exception e) {
+			log.warn("关注流推送失败，写入补偿任务: blogId={}, error={}", event.getBlogId(), e.getMessage());
+			compensationService.saveCompensation("feed:push",
+					event.getAuthorId() + ":" + event.getBlogId() + ":" + (event.getTimestamp() / 1000),
+					event.getTimestamp());
+		}
 	}
 
 	@RabbitListener(bindings = @QueueBinding(
@@ -51,7 +62,15 @@ public class FeedListener {
 	public void onFollow(FollowEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("关注回填: fansId={}, followId={}", event.getFansId(), event.getFollowId());
-		feedService.backfillOnFollow(event.getFansId(), event.getFollowId());
+		try {
+			feedService.backfillOnFollow(event.getFansId(), event.getFollowId());
+		} catch (Exception e) {
+			log.warn("关注回填失败，写入补偿任务: fansId={}, followId={}, error={}",
+					event.getFansId(), event.getFollowId(), e.getMessage());
+			compensationService.saveCompensation("feed:backfill",
+					event.getFansId() + ":" + event.getFollowId(),
+					event.getTimestamp());
+		}
 	}
 
 	@RabbitListener(bindings = @QueueBinding(
@@ -62,7 +81,15 @@ public class FeedListener {
 	public void onUnfollow(FollowEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("取关清理: fansId={}, followId={}", event.getFansId(), event.getFollowId());
-		feedService.cleanupOnUnfollow(event.getFansId(), event.getFollowId());
+		try {
+			feedService.cleanupOnUnfollow(event.getFansId(), event.getFollowId());
+		} catch (Exception e) {
+			log.warn("取关清理失败，写入补偿任务: fansId={}, followId={}, error={}",
+					event.getFansId(), event.getFollowId(), e.getMessage());
+			compensationService.saveCompensation("feed:cleanup",
+					event.getFansId() + ":" + event.getFollowId(),
+					event.getTimestamp());
+		}
 	}
 
 	@RabbitListener(bindings = @QueueBinding(
@@ -73,7 +100,14 @@ public class FeedListener {
 	public void onBlinkPublish(BlinkEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("动态发布推送到关注流: blinkId={}", event.getBlinkId());
-		feedService.pushBlinkToFollowers(event.getUserId(), event.getBlinkId(), event.getTimestamp() / 1000);
+		try {
+			feedService.pushBlinkToFollowers(event.getUserId(), event.getBlinkId(), event.getTimestamp() / 1000);
+		} catch (Exception e) {
+			log.warn("动态推送失败，写入补偿任务: blinkId={}, error={}", event.getBlinkId(), e.getMessage());
+			compensationService.saveCompensation("feed:blink",
+					event.getUserId() + ":" + event.getBlinkId() + ":" + (event.getTimestamp() / 1000),
+					event.getTimestamp());
+		}
 	}
 
 }

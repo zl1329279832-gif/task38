@@ -1,6 +1,7 @@
 package cn.sticki.user.listener;
 
-import cn.sticki.comment.sdk.CommentDTO;
+import cn.sticki.comment.sdk.CommentEvent;
+import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
 import cn.sticki.user.mapper.UserGeneralMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -16,9 +17,10 @@ import static cn.sticki.comment.sdk.MqConstants.BLOG_COMMENT_INCREASE_KEY;
 import static cn.sticki.comment.sdk.MqConstants.COMMENT_TOPIC_EXCHANGE;
 
 /**
- * @author durance
- * @version 1.0
- * @date 2022/10/5 14:20
+ * 监听Comment模块的消息，更新用户评论统计数据
+ * <p>
+ * 使用 CommentEvent（继承 BaseEvent）替代旧的 CommentDTO，
+ * 通过 EventIdempotencyService 保证事件幂等性，防止重复投递导致评论计数错误。
  */
 @Slf4j
 @Component
@@ -31,36 +33,35 @@ public class CommentListener {
 	@Resource
 	private UserGeneralMapper userGeneralMapper;
 
+	@Resource
+	private EventIdempotencyService eventIdempotencyService;
+
 	/**
-	 * 用户评论博客
-	 *
-	 * @param commentDTO 评论操作操作消息
+	 * 用户评论博客 - 评论数+1
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = COMMENT_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_COMMENT_QUEUE),
 			key = BLOG_COMMENT_INCREASE_KEY
 	))
-	public void commentAddUserGeneral(CommentDTO commentDTO) {
-		log.debug("用户 {} 评论加1", commentDTO.getAuthorId());
-		userGeneralMapper.updateCommentNumByUserId(commentDTO.getAuthorId(), 1);
-
+	public void commentAddUserGeneral(CommentEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		log.debug("用户 {} 评论加1", event.getAuthorId());
+		userGeneralMapper.updateCommentNumByUserId(event.getAuthorId(), 1);
 	}
 
 	/**
-	 * 用户删除评论
-	 *
-	 * @param commentDTO 评论操作操作消息
+	 * 用户删除评论 - 评论数-1（评论删除回滚）
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = COMMENT_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_COMMENT_QUEUE_CANCEL),
 			key = BLOG_COMMENT_DECREASE_KEY
 	))
-	public void commentreduceUserGeneral(CommentDTO commentDTO) {
-		log.debug("用户 {} 评论 -1", commentDTO.getAuthorId());
-		userGeneralMapper.updateCommentNumByUserId(commentDTO.getAuthorId(), -1);
-
+	public void commentReduceUserGeneral(CommentEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		log.debug("用户 {} 评论 -1", event.getAuthorId());
+		userGeneralMapper.updateCommentNumByUserId(event.getAuthorId(), -1);
 	}
 
 }
