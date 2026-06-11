@@ -12,6 +12,10 @@
 	<artifactId>common-amqp</artifactId>
 
 	<dependencies>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+		</dependency>
 		<!--AMQP依赖，包含RabbitMQ-->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

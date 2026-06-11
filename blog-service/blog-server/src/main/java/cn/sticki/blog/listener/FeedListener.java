@@ -6,6 +6,7 @@ import cn.sticki.blog.service.FeedService;
 import cn.sticki.blink.sdk.BlinkEvent;
 import cn.sticki.blink.sdk.BlinkMqConstants;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import cn.sticki.user.sdk.FollowEvent;
 import cn.sticki.user.sdk.UserMqConstants;
 import jakarta.annotation.Resource;
@@ -32,6 +33,9 @@ public class FeedListener {
 	@Resource
 	private EventIdempotencyService eventIdempotencyService;
 
+	@Resource
+	private CompensationTaskService compensationTaskService;
+
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BlogMqConstants.BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = FEED_PUBLISH_QUEUE),
@@ -39,8 +43,13 @@ public class FeedListener {
 	))
 	public void onBlogPublish(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
-		log.debug("博客发布推送到关注流: blogId={}", event.getBlogId());
-		feedService.pushBlogToFollowers(event.getAuthorId(), event.getBlogId(), event.getTimestamp() / 1000);
+		try {
+			log.debug("博客发布推送到关注流: blogId={}", event.getBlogId());
+			feedService.pushBlogToFollowers(event.getAuthorId(), event.getBlogId(), event.getTimestamp() / 1000);
+		} catch (Exception e) {
+			compensationTaskService.saveForRetry(event, "blog.feed.publish", e);
+			throw e;
+		}
 	}
 
 	@RabbitListener(bindings = @QueueBinding(
@@ -50,8 +59,13 @@ public class FeedListener {
 	))
 	public void onFollow(FollowEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
-		log.debug("关注回填: fansId={}, followId={}", event.getFansId(), event.getFollowId());
-		feedService.backfillOnFollow(event.getFansId(), event.getFollowId());
+		try {
+			log.debug("关注回填: fansId={}, followId={}", event.getFansId(), event.getFollowId());
+			feedService.backfillOnFollow(event.getFansId(), event.getFollowId());
+		} catch (Exception e) {
+			compensationTaskService.saveForRetry(event, "blog.feed.follow", e);
+			throw e;
+		}
 	}
 
 	@RabbitListener(bindings = @QueueBinding(
@@ -61,8 +75,13 @@ public class FeedListener {
 	))
 	public void onUnfollow(FollowEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
-		log.debug("取关清理: fansId={}, followId={}", event.getFansId(), event.getFollowId());
-		feedService.cleanupOnUnfollow(event.getFansId(), event.getFollowId());
+		try {
+			log.debug("取关清理: fansId={}, followId={}", event.getFansId(), event.getFollowId());
+			feedService.cleanupOnUnfollow(event.getFansId(), event.getFollowId());
+		} catch (Exception e) {
+			compensationTaskService.saveForRetry(event, "blog.feed.unfollow", e);
+			throw e;
+		}
 	}
 
 	@RabbitListener(bindings = @QueueBinding(
@@ -72,8 +91,13 @@ public class FeedListener {
 	))
 	public void onBlinkPublish(BlinkEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
-		log.debug("动态发布推送到关注流: blinkId={}", event.getBlinkId());
-		feedService.pushBlinkToFollowers(event.getUserId(), event.getBlinkId(), event.getTimestamp() / 1000);
+		try {
+			log.debug("动态发布推送到关注流: blinkId={}", event.getBlinkId());
+			feedService.pushBlinkToFollowers(event.getUserId(), event.getBlinkId(), event.getTimestamp() / 1000);
+		} catch (Exception e) {
+			compensationTaskService.saveForRetry(event, "blog.feed.blink", e);
+			throw e;
+		}
 	}
 
 }

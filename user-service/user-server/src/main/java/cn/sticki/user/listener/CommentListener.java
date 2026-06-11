@@ -1,6 +1,8 @@
 package cn.sticki.user.listener;
 
-import cn.sticki.comment.sdk.CommentDTO;
+import cn.sticki.comment.sdk.CommentEvent;
+import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import cn.sticki.user.mapper.UserGeneralMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -31,36 +33,52 @@ public class CommentListener {
 	@Resource
 	private UserGeneralMapper userGeneralMapper;
 
+	@Resource
+	private EventIdempotencyService eventIdempotencyService;
+
+	@Resource
+	private CompensationTaskService compensationTaskService;
+
 	/**
 	 * 用户评论博客
 	 *
-	 * @param commentDTO 评论操作操作消息
+	 * @param event 评论操作事件
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = COMMENT_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_COMMENT_QUEUE),
 			key = BLOG_COMMENT_INCREASE_KEY
 	))
-	public void commentAddUserGeneral(CommentDTO commentDTO) {
-		log.debug("用户 {} 评论加1", commentDTO.getAuthorId());
-		userGeneralMapper.updateCommentNumByUserId(commentDTO.getAuthorId(), 1);
-
+	public void commentAddUserGeneral(CommentEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		try {
+			log.debug("用户 {} 评论加1", event.getAuthorId());
+			userGeneralMapper.updateCommentNumByUserId(event.getAuthorId(), 1);
+		} catch (Exception e) {
+			compensationTaskService.saveForRetry(event, "user.operate.comment", e);
+			throw e;
+		}
 	}
 
 	/**
 	 * 用户删除评论
 	 *
-	 * @param commentDTO 评论操作操作消息
+	 * @param event 评论操作事件
 	 */
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = COMMENT_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = USER_COMMENT_QUEUE_CANCEL),
 			key = BLOG_COMMENT_DECREASE_KEY
 	))
-	public void commentreduceUserGeneral(CommentDTO commentDTO) {
-		log.debug("用户 {} 评论 -1", commentDTO.getAuthorId());
-		userGeneralMapper.updateCommentNumByUserId(commentDTO.getAuthorId(), -1);
-
+	public void commentReduceUserGeneral(CommentEvent event) {
+		if (!eventIdempotencyService.tryConsume(event)) return;
+		try {
+			log.debug("用户 {} 评论 -1", event.getAuthorId());
+			userGeneralMapper.updateCommentNumByUserId(event.getAuthorId(), -1);
+		} catch (Exception e) {
+			compensationTaskService.saveForRetry(event, "user.operate.comment.cancel", e);
+			throw e;
+		}
 	}
 
 }

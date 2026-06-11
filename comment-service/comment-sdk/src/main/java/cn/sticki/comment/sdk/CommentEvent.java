@@ -36,10 +36,10 @@ public class CommentEvent extends BaseEvent {
 	}
 
 	public static CommentEvent ofIncrease(Integer blogId, Integer userId, String content, Integer authorId, Integer commentId) {
-		return create(blogId, userId, content, authorId, commentId, MqConstants.BLOG_COMMENT_INCREASE_KEY, "comment:increase:" + commentId);
+		return create(blogId, userId, content, authorId, commentId, MqConstants.BLOG_COMMENT_INCREASE_KEY, "comment:" + commentId);
 	}
 
 	public static CommentEvent ofDecrease(Integer blogId, Integer userId, Integer authorId, Integer commentId) {
-		return create(blogId, userId, null, authorId, commentId, MqConstants.BLOG_COMMENT_DECREASE_KEY, "comment:decrease:" + commentId);
+		return create(blogId, userId, null, authorId, commentId, MqConstants.BLOG_COMMENT_DECREASE_KEY, "comment:" + commentId);
 	}
 }

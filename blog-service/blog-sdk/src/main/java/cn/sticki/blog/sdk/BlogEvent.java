@@ -53,7 +53,7 @@ public class BlogEvent extends BaseEvent {
 	}
 
 	public static BlogEvent ofLikeCancel(Integer blogId, Integer userId, Integer authorId) {
-		return create(blogId, userId, authorId, BlogMqConstants.BLOG_OPERATE_LIKE_CANCEL_KEY, "blog:like:cancel:" + userId + ":" + blogId);
+		return create(blogId, userId, authorId, BlogMqConstants.BLOG_OPERATE_LIKE_CANCEL_KEY, "blog:like:" + userId + ":" + blogId);
 	}
 
 	public static BlogEvent ofCollect(Integer blogId, Integer userId, Integer authorId) {
@@ -61,7 +61,7 @@ public class BlogEvent extends BaseEvent {
 	}
 
 	public static BlogEvent ofCollectCancel(Integer blogId, Integer userId, Integer authorId) {
-		return create(blogId, userId, authorId, BlogMqConstants.BLOG_OPERATE_COLLECT_CANCEL_KEY, "blog:collect:cancel:" + userId + ":" + blogId);
+		return create(blogId, userId, authorId, BlogMqConstants.BLOG_OPERATE_COLLECT_CANCEL_KEY, "blog:collect:" + userId + ":" + blogId);
 	}
 
 	public static BlogEvent ofRelay(Integer blogId, Integer userId, Integer authorId) {
