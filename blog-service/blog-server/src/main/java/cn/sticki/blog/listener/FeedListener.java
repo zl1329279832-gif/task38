@@ -7,6 +7,7 @@ import cn.sticki.blog.service.FeedService;
 import cn.sticki.blink.sdk.BlinkEvent;
 import cn.sticki.blink.sdk.BlinkMqConstants;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import cn.sticki.user.sdk.FollowEvent;
 import cn.sticki.user.sdk.UserMqConstants;
 import jakarta.annotation.Resource;
@@ -36,6 +37,9 @@ public class FeedListener {
 	@Resource
 	private CompensationService compensationService;
 
+	@Resource
+	private CompensationTaskService compensationTaskService;
+
 	@RabbitListener(bindings = @QueueBinding(
 			exchange = @Exchange(name = BlogMqConstants.BLOG_TOPIC_EXCHANGE, type = ExchangeTypes.TOPIC),
 			value = @Queue(name = FEED_PUBLISH_QUEUE),
@@ -48,6 +52,7 @@ public class FeedListener {
 			feedService.pushBlogToFollowers(event.getAuthorId(), event.getBlogId(), event.getTimestamp() / 1000);
 		} catch (Exception e) {
 			log.warn("关注流推送失败，写入补偿任务: blogId={}, error={}", event.getBlogId(), e.getMessage());
+			compensationTaskService.saveForRetry(event, FEED_PUBLISH_QUEUE, (RuntimeException) e);
 			compensationService.saveCompensation("feed:push",
 					event.getAuthorId() + ":" + event.getBlogId() + ":" + (event.getTimestamp() / 1000),
 					event.getTimestamp());
@@ -67,6 +72,7 @@ public class FeedListener {
 		} catch (Exception e) {
 			log.warn("关注回填失败，写入补偿任务: fansId={}, followId={}, error={}",
 					event.getFansId(), event.getFollowId(), e.getMessage());
+			compensationTaskService.saveForRetry(event, FEED_FOLLOW_QUEUE, (RuntimeException) e);
 			compensationService.saveCompensation("feed:backfill",
 					event.getFansId() + ":" + event.getFollowId(),
 					event.getTimestamp());

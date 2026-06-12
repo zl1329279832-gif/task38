@@ -5,6 +5,7 @@ import cn.sticki.blog.sdk.BlogMqConstants;
 import cn.sticki.blog.service.RankService;
 import cn.sticki.blog.service.impl.BlogStatsCacheService;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.ExchangeTypes;
@@ -41,6 +42,9 @@ public class BlogListener {
 	@Resource
 	private BlogStatsCacheService blogStatsCacheService;
 
+	@Resource
+	private CompensationTaskService compensationTaskService;
+
 	/**
 	 * 用户浏览博客对博客热度进行增加
 	 *
@@ -54,12 +58,14 @@ public class BlogListener {
 	public void seeAddRankHotScore(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("{} 被浏览热度加1", event.getBlogId());
-		// 使博客统计缓存失效，确保重算时使用最新数据
-		blogStatsCacheService.invalidate(event.getBlogId());
-		// 重新计算博客热榜分数（含时间衰减和风控）
-		rankService.recalculateBlogHotScore(event.getBlogId());
-		// 作者活跃度加1
-		rankService.updateAuthorActivityScore(event.getAuthorId(), 1.0);
+		try {
+			blogStatsCacheService.invalidate(event.getBlogId());
+			rankService.recalculateBlogHotScore(event.getBlogId());
+			rankService.updateAuthorActivityScore(event.getAuthorId(), 1.0);
+		} catch (RuntimeException e) {
+			compensationTaskService.saveForRetry(event, SEE_RANK_QUEUE, e);
+			throw e;
+		}
 	}
 
 	/**

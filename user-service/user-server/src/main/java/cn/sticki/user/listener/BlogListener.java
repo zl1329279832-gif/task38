@@ -2,6 +2,7 @@ package cn.sticki.user.listener;
 
 import cn.sticki.blog.sdk.BlogEvent;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import cn.sticki.user.mapper.UserGeneralMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +44,9 @@ public class BlogListener {
 
 	@Resource
 	private EventIdempotencyService eventIdempotencyService;
+
+	@Resource
+	private CompensationTaskService compensationTaskService;
 
 	/**
 	 * 用户访问博客 - 浏览量+1
@@ -97,7 +101,12 @@ public class BlogListener {
 	public void likeAddUserGeneral(BlogEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("用户 {} 点赞加1", event.getBlogId());
-		userGeneralMapper.updateLikeNumByUserId(event.getAuthorId(), 1);
+		try {
+			userGeneralMapper.updateLikeNumByUserId(event.getAuthorId(), 1);
+		} catch (RuntimeException e) {
+			compensationTaskService.saveForRetry(event, USER_LIKE_QUEUE, e);
+			throw e;
+		}
 	}
 
 	/**

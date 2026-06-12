@@ -2,6 +2,7 @@ package cn.sticki.user.listener;
 
 import cn.sticki.comment.sdk.CommentEvent;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import cn.sticki.user.mapper.UserGeneralMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,9 @@ public class CommentListener {
 	@Resource
 	private EventIdempotencyService eventIdempotencyService;
 
+	@Resource
+	private CompensationTaskService compensationTaskService;
+
 	/**
 	 * 用户评论博客 - 评论数+1
 	 */
@@ -47,7 +51,12 @@ public class CommentListener {
 	public void commentAddUserGeneral(CommentEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
 		log.debug("用户 {} 评论加1", event.getAuthorId());
-		userGeneralMapper.updateCommentNumByUserId(event.getAuthorId(), 1);
+		try {
+			userGeneralMapper.updateCommentNumByUserId(event.getAuthorId(), 1);
+		} catch (RuntimeException e) {
+			compensationTaskService.saveForRetry(event, USER_COMMENT_QUEUE, e);
+			throw e;
+		}
 	}
 
 	/**

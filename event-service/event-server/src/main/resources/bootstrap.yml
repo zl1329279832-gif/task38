@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: event-server
+  cloud:
+    nacos:
+      server-addr: 127.0.0.1:8848
+      config:
+        file-extension: yaml
+        shared-configs:
+          - data-id: public-mybatis-plus.yaml
+          - data-id: default-redis.yaml
+          - data-id: default-springmvc.yaml
+          - data-id: default-rabbitmq.yaml
+          - data-id: default-feign.yaml

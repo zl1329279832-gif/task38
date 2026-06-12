@@ -5,6 +5,7 @@ import cn.sticki.blog.service.RankService;
 import cn.sticki.blog.service.impl.BlogStatsCacheService;
 import cn.sticki.comment.sdk.CommentEvent;
 import cn.sticki.common.amqp.autoconfig.EventIdempotencyService;
+import cn.sticki.common.amqp.compensation.CompensationTaskService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.core.ExchangeTypes;
@@ -42,6 +43,9 @@ public class CommentListener {
 	@Resource
 	private BlogStatsCacheService blogStatsCacheService;
 
+	@Resource
+	private CompensationTaskService compensationTaskService;
+
 	/**
 	 * 博客评论数量增加
 	 *
@@ -54,13 +58,15 @@ public class CommentListener {
 	))
 	public void commentNumberIncreaseListener(CommentEvent event) {
 		if (!eventIdempotencyService.tryConsume(event)) return;
-		// 增加博客的评论数量
 		log.debug("{} 评论数量+1", event.getBlogId());
-		blogGeneralMapper.increaseCommentNum(event.getBlogId());
-		// 使博客统计缓存失效，确保重算时使用最新数据
-		blogStatsCacheService.invalidate(event.getBlogId());
-		// 重新计算博客热榜分数（含时间衰减和风控）
-		rankService.recalculateBlogHotScore(event.getBlogId());
+		try {
+			blogGeneralMapper.increaseCommentNum(event.getBlogId());
+			blogStatsCacheService.invalidate(event.getBlogId());
+			rankService.recalculateBlogHotScore(event.getBlogId());
+		} catch (RuntimeException e) {
+			compensationTaskService.saveForRetry(event, COMMENT_INCREASE_QUEUE, e);
+			throw e;
+		}
 	}
 
 	/**
