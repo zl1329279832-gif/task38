@@ -1,22 +1,24 @@
-package cn.sticki.resource;
+package cn.sticki.event;
 
 import cn.sticki.common.amqp.autoconfig.EnableAmqpMessageConverterConfig;
+import cn.sticki.common.redis.autoconfig.EnableRedisSerialize;
+import cn.sticki.common.tool.mybatisconfig.EnableMybatisPlusIPage;
 import cn.sticki.common.web.advice.EnableDefaultExceptionAdvice;
 import cn.sticki.common.web.advice.EnableDefaultResponseAdvice;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
-/**
- * @author 阿杆
- */
 @SpringBootApplication
+@EnableMybatisPlusIPage
+@EnableRedisSerialize
+@EnableAmqpMessageConverterConfig
 @EnableDefaultExceptionAdvice
 @EnableDefaultResponseAdvice
-@EnableAmqpMessageConverterConfig
-public class ResourceServerApplication {
+@EnableScheduling
+public class EventServerApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ResourceServerApplication.class, args);
+		SpringApplication.run(EventServerApplication.class, args);
 	}
-
 }

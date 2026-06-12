@@ -18,4 +18,6 @@ public abstract class BaseEvent implements Serializable {
 	private String eventType;
 	/** 基于业务语义的确定性幂等键，同一操作始终产生相同key */
 	private String idempotentKey;
+	/** 事件模型版本号，用于 schema 演进，默认 1 */
+	private int eventVersion = 1;
 }

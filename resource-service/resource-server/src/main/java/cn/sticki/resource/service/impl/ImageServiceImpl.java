@@ -2,10 +2,13 @@ package cn.sticki.resource.service.impl;
 
 import cn.sticki.common.result.RestResult;
 import cn.sticki.common.web.utils.ResponseUtils;
+import cn.sticki.common.web.auth.AuthHelper;
 import cn.sticki.resource.config.ResourcePath;
 import cn.sticki.resource.exception.UploadException;
 import cn.sticki.resource.mapper.ImageMapper;
 import cn.sticki.resource.pojo.Image;
+import cn.sticki.resource.sdk.ResourceEvent;
+import cn.sticki.resource.sdk.ResourceMqConstants;
 import cn.sticki.resource.service.ImageService;
 import cn.sticki.resource.service.MinioService;
 import cn.sticki.resource.service.QiNiuService;
@@ -18,6 +21,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,6 +45,9 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, Image> implements
 
 	@Resource
 	private ImageMapper imageMapper;
+
+	@Resource
+	private RabbitTemplate rabbitTemplate;
 
 	@Override
 	public void getAvatarImage(String file, HttpServletResponse response) {
@@ -107,7 +114,24 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, Image> implements
 				minioService.upload(image, md5, bucketName);
 			}
 			// 返回访问链接
-			return ResourcePath.imageUrlBase + md5;
+			String url = ResourcePath.imageUrlBase + md5;
+
+			// 发布资源上传事件
+			try {
+				Integer userId = AuthHelper.getCurrentUserId();
+				if (userId != null) {
+					ResourceEvent event = ResourceEvent.ofUpload(userId, url, bucketName);
+					rabbitTemplate.convertAndSend(
+							ResourceMqConstants.RESOURCE_TOPIC_EXCHANGE,
+							ResourceMqConstants.RESOURCE_UPLOAD_KEY,
+							event
+					);
+				}
+			} catch (Exception e) {
+				log.warn("资源上传事件发布失败: url={}", url, e);
+			}
+
+			return url;
 		}
 	}
 

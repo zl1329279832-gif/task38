@@ -3,15 +3,23 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<parent>
-		<artifactId>resource-service</artifactId>
+		<artifactId>event-service</artifactId>
 		<groupId>cn.sticki</groupId>
 		<version>1.0.0</version>
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 
-	<artifactId>resource-sdk</artifactId>
+	<artifactId>event-client</artifactId>
 
 	<dependencies>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-circuitbreaker-resilience4j</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>cn.sticki</groupId>
 			<artifactId>common-core</artifactId>
@@ -19,16 +27,9 @@
 		</dependency>
 		<dependency>
 			<groupId>cn.sticki</groupId>
-			<artifactId>common-amqp</artifactId>
+			<artifactId>event-sdk</artifactId>
 			<version>1.0.0</version>
 		</dependency>
-		<dependency>
-			<groupId>org.projectlombok</groupId>
-			<artifactId>lombok</artifactId>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework</groupId>
-			<artifactId>spring-web</artifactId>
-		</dependency>
 	</dependencies>
+
 </project>

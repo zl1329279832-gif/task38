@@ -1,0 +1,6 @@
+server:
+  port: 40050
+
+spring:
+  application:
+    name: event-server
